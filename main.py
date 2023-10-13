@@ -1,3 +1,5 @@
+
+#list of library imports
 import os
 from datetime import datetime
 from traceback import print_tb
@@ -10,8 +12,9 @@ from collections import Counter
 import tkinter as tk
 from tkinter import filedialog
 import re
+#end of imports
 
-#output def
+#output class to build the output and directory.  may need to modify where the target directory goes
 def outputfiles(folioDF,EbscoDF,mergeDF):
     outputDir = '.\FY2023 stats\output' #define output folder, should it not exist it will be created 
     isExist = os.path.exists(outputDir)

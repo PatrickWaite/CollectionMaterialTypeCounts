@@ -1,3 +1,5 @@
+#custom library containing various SQL queries as callible functions
+
 def get_FolioTitlesQuery():
     titles = """
     select 
@@ -40,3 +42,4 @@ def get_materialTypeQuery():
     from inventory.material_type__t
     """
     return materials
+

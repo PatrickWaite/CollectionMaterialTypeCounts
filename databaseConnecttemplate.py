@@ -1,3 +1,6 @@
+#blank connection string to be use with sqlAchemy this can be modified based on the requiremets for the database being connected to
+
+#postGreSQL connection string
 def get_connectionString():
     user = '' 
     password = ''
