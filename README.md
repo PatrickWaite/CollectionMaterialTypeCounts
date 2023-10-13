@@ -1,3 +1,4 @@
 # CollectionMaterialTypeCounts
-this contains code that pulls volume and title count data from Folio and HLM for use in collection data reporting
-this project is built to pull data from the FOLIO ILS using sqlachemy library and parse through reports drawn out of ebsco's HLM envrioment to consolidate collection title and volume counts for use in various data reporting ventures including ARL and ACRL reports.
+This project's primary objective is to extract volume and title count data from Folio and HLM systems, streamlining the collection data reporting process. Utilizing the SQLalchemy library, it efficiently retrieves information from the FOLIO Integrated Library System. Additionally, it parses reports extracted from the Ebsco's HLM environment, consolidating collection title and volume counts. These data sets are instrumental for various data reporting initiatives, including aspects of ARL (Association of Research Libraries) and ACRL (Association of College and Research Libraries) reports. 
+
+
