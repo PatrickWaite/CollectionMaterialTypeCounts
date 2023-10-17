@@ -1,9 +1,16 @@
+#settlesments to insure pacakges are installed correctly
+import subprocess
+import sys
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m","pip", "install", package])
+
+
 
 #list of library imports
 import os
 from datetime import datetime
 from traceback import print_tb
-from dbConnect import get_connectionString
 from queries import get_FolioTitlesQuery, get_materialTypeQuery
 from sqlalchemy import create_engine, text
 import pandas as pd
@@ -12,18 +19,26 @@ from collections import Counter
 import tkinter as tk
 from tkinter import filedialog
 import re
+
+#if getting code from github uncomment the line below
+#from databaseConnecttemplate import get_connectionString 
+
+#if getting code from github comment out the line below
+from dbConnect import get_connectionString 
 #end of imports
 
 #output class to build the output and directory.  may need to modify where the target directory goes
 def outputfiles(folioDF,EbscoDF,mergeDF):
-    outputDir = '.\FY2023 stats\output' #define output folder, should it not exist it will be created 
+    outputDir = '.\FY202XStats\output' #define output folder, should it not exist it will be created 
+    #logic check to see if output directory exists
     isExist = os.path.exists(outputDir)
     print(isExist)
     if not isExist:
         # Create a new directory because it does not exist 
         os.makedirs(outputDir)
         print("The new directory is created!")
-    #save dataframe outputs to output directory with a date
+    
+    #save dataframe outputs to output directory with a date, outputs all dataframes entered as both csv or excel files
     date = datetime.now()
     dt = date.strftime("%d%m%Y")
     folioDF.to_csv(f'{outputDir}/Folio_Title_{dt}.csv', index=False)
@@ -46,37 +61,56 @@ def foiloTitles():
 
 #create connection and execute query from quries.py
     with engine.connect() as conn: 
-            #Note call the text() from sqlachemy to turn the text string result from get_inventoryQuery() into
-            #an executable SQL
+            #Note call the text() from sqlachemy to turn the text string result from get_inventoryQuery() into an executable SQL
+        #pull out the material type list from FOLIO
         df_MatrerialType = pd.DataFrame(conn.execute(text(get_materialTypeQuery())))
+        #pulls the records from Folio
         df_UM_Title = pd.DataFrame(conn.execute(text(get_FolioTitlesQuery())))
 
-    #microform extractions of the material type Microforms
+    #microforms records had migrated with the incorrect material type in some cases 
+    #the below logic addresses this and makes the data consistant to our needs 
+
+    #microform extractions of the material type Microforms, pulls the material type 'Microform' from the large dataset of titles into its own DF, it will be recombine later on
+    #mt = material type
     microfrom_remove_filter = df_UM_Title['material_type'] == 'Microform'
     df_um_mt_microform = pd.DataFrame(df_UM_Title.loc[microfrom_remove_filter])
     condition = df_UM_Title['title'].isin(df_um_mt_microform['title'])
     df_UM_Title.drop(df_UM_Title[condition].index,inplace=True)
 
-    #this extracts and assigns the records ffrom df_um_titles where the title contains 'microform' and assigns tthem to a new Dataframe
+    #this extracts and assigns the records from df_um_titles where the title contains 'microform' and assigns them to a new Dataframe
+    #title = microform marker [microform] contained in the title info
     DF_um_title_microform = pd.DataFrame(df_UM_Title.loc[df_UM_Title['title'].str.contains("microform")==True])
     DF_um_title_microform['material_type'].value_counts()
+    #pulls both microform Dataframes and combines them into one DF to be joined back with the records 
     df_Microform = pd.concat([df_um_mt_microform,DF_um_title_microform])
+    #assign the proper datatype for all microform records
     df_Microform = df_Microform.assign(material_type='Microform')
     condition = df_UM_Title['title'].isin(DF_um_title_microform['title'])
     df_UM_Title.drop(df_UM_Title[condition].index,inplace=True)
 
+    #pull the full Microform dataframes and attaches it back to the total Title dataframes with the corrected material type assigned 
     df_UM_Title = pd.concat([df_UM_Title,df_Microform])
 
+
+    #to start the count by material type using for loops sorta the long form is a bit more cumbersom but this allows a more direct build of the title/volume array by material type
     for i in df_MatrerialType['name']:
         #print(i)
-        x = str(i)
+        #x = str(i)
+        
+        #build the filter used 
         filter = df_UM_Title['material_type'] == i
+        
         #this will create local dataframes, use name has no dashes or spaces 
-        #df_um_titles belo will be changed to df_um_tiles_sans_Microforms to account for moving microform to its own
+        #df_um_titles below will be changed to df_um_tiles_sans_Microforms to account for moving microform to its own
+        
         #CondencedMatType = df_um_titles[filter]
+        
         #creating the variable Dataframe
         locals()["df_"+i] = df_UM_Title.loc[filter]
         push = df_UM_Title.loc[filter]
+        #this will give a little print out for the builds as this runs
+        #volume = df record count 
+        #title = unique Instance record count. we need to use the pd.unique value because our df is built from ITEM records first meaning that the 1:many ratio is in reverse.
         print(f'Material Type | {i}')
         uniquetitle = pd.unique(push['holdingid'])
         print(f'Unique holdings for {i} material type | {len(uniquetitle)}')
@@ -89,8 +123,11 @@ def foiloTitles():
         #locals()["cobj_"+i] = Counter(locals()["np_"+i])
         #locals()["keys_"+i] = locals()["cobj_"+i].keys()
         #locals()["tcount_"+i] = len(locals()["keys_"+i])
+        #pulls the # of unique instances into the local variables  
         locals()["tcount_"+i] = len(uniqueInstance)
 
+
+    #builds out consolidation volume/title count df for Folio related amounts
     header = ['Material_Type', 'Volume_Count', 'Title_Count']
     df = pd.DataFrame() #columns=header
     for i in df_MatrerialType['name']:
@@ -106,6 +143,25 @@ def foiloTitles():
 
 #be aware of 'mark for delete record', surpression flag in item and holdings.  "discovery_suppress"(may need to look more into this) "item status"(only on item record)
 
+# for ACRL marks for use of totaling 
+# T0 = EXCLUDED
+# T1 = MONOGRAPHS
+# T2 = E-BOOKS
+# T3 = DATABASE
+# T4 = PHYSICAL MEDIA
+# T5 = DIGITAL MEDIA
+# T6 = SERIALS
+# T7 = E-SERIALS
+# T8 = include only in total physical title count
+# T9 = inlcude only in digital title count
+
+# for the total physical counts 
+#    Physical volume counts should include T1, T4, T6
+#    Physical title count should include T1, T4, T6, T8
+# for the total digital count (only need title count)
+#    digital title count should include T2, T3, T5, T7, T9
+
+#this marks the the material type for later summations based on the questions asked and how we interprate what material types need to be reported for what 
 def FolioForm(folio):
     folioReportCountMark = []
     acrlMark = []
@@ -344,19 +400,20 @@ def FolioForm(folio):
     folio['ARLQ4'] = arlMarkQ4
     #return folioReportCountMark
 
+
 ##Ebsco stuff
 def EbscoTitles():
     root = tk.Tk()
     root.withdraw()
-
+    #needs to load file from ebsco HLM reporting, if not using ebsco as your discovery layer code may(will) require some modifications
     file_path = filedialog.askopenfilename()
-#if this take a long time miniize the window its likely that the dialog didnt take focus
+    #if this take a long time miniize the window its likely that the dialog didnt take focus
 
-#assign file to dataframe
+    #assign file to dataframe
     Ebsco = pd.DataFrame(pd.read_csv(file_path, index_col=False))
 
-#for whatever reason all january downloads of the hlm report from ebsco is not counting 'KBID' number column as its own column so all values are shifted to the left by 1 column
-
+    #for whatever reason all january downloads of the hlm report from ebsco is not counting 'KBID' number column as its own column so all values are shifted to the left by 1 column
+    #trim dataframe to just what i need to use (kbid = ebsco's 'propriatry' unique idenifier, title = article/object title, ResoruceType = what ebsco defines the material type is)
     cutdf = Ebsco[['KBID','Title','ResourceType']]
 #    cutdf = Ebsco[['KBID','Title','Subject']]
     #print(cutdf)
@@ -364,9 +421,11 @@ def EbscoTitles():
 #    resource = cutdf['Subject'].value_counts()
     resource.to_numpy()
 
+    #ebsco uses weird material types as such we need to regex some of it it before we can process the unique Kbid value
     for i in resource.keys():
         x = str(i)
         condencedMatType = re.sub(r'[^A-Za-z0-9]+','',x)
+        print(x)
         filter = cutdf['ResourceType'] == i
     #    filter = cutdf['Subject'] == i
         Ufill = cutdf.loc[filter]
@@ -556,6 +615,14 @@ def ebscoForm(ebsco):
 
 
 def main():
+    #check/install required packages
+    install('numpy')
+    install('pandas')
+    install('psycopg2')
+    install('psycopg2_binary')
+    install('SQLAlchemy')
+
+
     #run folio titles
     FT = foiloTitles()
     print('Folio Finished')
