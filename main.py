@@ -615,7 +615,7 @@ def ebscoForm(ebsco):
 
 
 def main():
-    #check/install required packages
+    #check/install required packages using pip as a subprocess 
     install('numpy')
     install('pandas')
     install('psycopg2')
